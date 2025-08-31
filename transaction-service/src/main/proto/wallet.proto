@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.walletservice.grpc";
+option java_outer_classname = "WalletProto";
+
+package wallet;
+
+// ----------------- Service Definition -----------------
+service WalletService {
+  // Wallet lifecycle
+  rpc CreateWallet(CreateWalletRequest) returns (WalletResponse);
+  rpc GetWallet(GetWalletRequest) returns (WalletResponse);
+
+  // Core wallet operations
+  rpc Credit(WalletOperationRequest) returns (WalletResponse);
+  rpc Debit(WalletOperationRequest) returns (WalletResponse);
+  rpc Transfer(TransferRequest) returns (WalletResponse);
+
+  // Transaction history
+  rpc GetTransactions(TransactionHistoryRequest) returns (TransactionHistoryResponse);
+}
+
+// ----------------- Wallet Messages -----------------
+
+enum WalletType {
+  WALLET_TYPE_UNSPECIFIED = 0;
+  CUSTOMER = 1;
+  MERCHANT = 2;
+}
+
+message CreateWalletRequest {
+  int64 userId = 1;
+  WalletType walletType = 2;
+  string requestId = 3; // idempotency key
+}
+
+message GetWalletRequest {
+  int64 userId = 1;
+  WalletType walletType = 2;
+}
+
+message WalletOperationRequest {
+  int64 userId = 1;
+  WalletType walletType = 2;
+  int32 amount = 3;
+  string requestId = 4; // idempotency key
+  string referenceId = 5; // external transaction reference
+}
+
+// ----------------- Transfer -----------------
+
+message TransferRequest {
+  int64 fromUserId = 1;
+  int64 toUserId = 2;
+  WalletType fromWalletType = 3;
+  WalletType toWalletType = 4;
+  int32 amount = 5;
+  string requestId = 6;
+  string referenceId = 7;
+}
+
+// ----------------- Transactions -----------------
+
+enum TransactionType {
+  TRANSACTION_TYPE_UNSPECIFIED = 0;
+  CREDIT = 1;
+  DEBIT = 2;
+  TRANSFER_IN = 3;
+  TRANSFER_OUT = 4;
+}
+
+enum TransactionStatus {
+  TRANSACTION_STATUS_UNSPECIFIED = 0;
+  SUCCESS = 1;
+  FAILED = 2;
+  PENDING = 3;
+}
+
+message Transaction {
+  string transactionId = 1;
+  int64 userId = 2;
+  WalletType walletType = 3;
+  TransactionType type = 4;
+  int32 amount = 5;
+  TransactionStatus status = 6;
+  string referenceId = 7;
+  string createdAt = 8; // ISO datetime
+}
+
+message TransactionHistoryRequest {
+  int64 userId = 1;
+  WalletType walletType = 2;
+  int32 page = 3;
+  int32 pageSize = 4;
+}
+
+message TransactionHistoryResponse {
+  repeated Transaction transactions = 1;
+  int32 page = 2;
+  int32 pageSize = 3;
+  int32 totalPages = 4;
+  int64 totalRecords = 5;
+}
+
+// ----------------- Standard Response -----------------
+
+message WalletResponse {
+  bool success = 1;
+  string message = 2;
+  int32 balance = 3; // balance is always in INR
+  string requestId = 4;
+  string updatedAt = 5;
+}

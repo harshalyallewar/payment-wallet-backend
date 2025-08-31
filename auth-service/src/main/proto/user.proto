@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package user;
+
+option java_multiple_files = true;
+option java_package = "com.userservice.grpc";
+option java_outer_classname = "UserServiceProto";
+
+// -------- ENUMS --------
+enum UserType {
+  CUSTOMER = 0;
+  MERCHANT = 1;
+  ADMIN = 2;
+}
+
+enum AccountStatus {
+  ACTIVE = 0;
+  SUSPENDED = 1;
+  CLOSED = 2;
+  PENDING_VERIFICATION = 3;
+}
+
+// -------- User Messages --------
+message UserRequest {
+  string email = 1; // UUID
+}
+
+message UserResponse {
+  string userId = 1; // UUID
+  string name = 2;
+  string email = 3;
+  string phoneNumber = 4;
+  UserType type = 5;
+  AccountStatus status = 6;
+  string password = 7;
+  bool success = 8;
+}
+
+// -------- Create User (for registration) --------
+message CreateUserRequest {
+  string name = 1;
+  string email = 2;
+  string phoneNumber = 3;
+  string password = 4;
+  UserType type = 5;
+  AccountStatus status = 6; // optional, default ACTIVE if not set
+}
+
+message CreateUserResponse {
+  string userId = 1; // UUID
+  bool success = 2;
+}
+
+// -------- Service Definition --------
+service UserService {
+  // Fetch user details by ID
+  rpc GetUser(UserRequest) returns (UserResponse);
+
+  // Register new user
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+}
