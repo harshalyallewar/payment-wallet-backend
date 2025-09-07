@@ -12,8 +12,8 @@ public interface DailySystemSummaryRepository extends JpaRepository<DailySystemS
 
     @Modifying
     @Query(value = """
-        INSERT INTO daily_system_summary (date, total_txns, total_volume, last_updated)
-        VALUES (?1, 1, ?2, NOW())
+        INSERT INTO daily_system_summary (date, total_users, new_users, total_txns, failed_txns, total_volume, last_updated)
+        VALUES (?1, 0, 0, 1, 0, ?2, NOW())
         ON CONFLICT (date) DO UPDATE SET
           total_txns = daily_system_summary.total_txns + 1,
           total_volume = daily_system_summary.total_volume + EXCLUDED.total_volume,
@@ -23,8 +23,8 @@ public interface DailySystemSummaryRepository extends JpaRepository<DailySystemS
 
     @Modifying
     @Query(value = """
-        INSERT INTO daily_system_summary (date, failed_txns, last_updated)
-        VALUES (?1, 1, NOW())
+        INSERT INTO daily_system_summary (date, total_users, new_users, total_txns, failed_txns, total_volume, last_updated)
+        VALUES (?1, 0, 0, 0, 1, 0, NOW())
         ON CONFLICT (date) DO UPDATE SET
           failed_txns = daily_system_summary.failed_txns + 1,
           last_updated = NOW()
@@ -33,8 +33,8 @@ public interface DailySystemSummaryRepository extends JpaRepository<DailySystemS
 
     @Modifying
     @Query(value = """
-        INSERT INTO daily_system_summary (date, new_users, total_users, last_updated)
-        VALUES (?1, 1, 1, NOW())
+        INSERT INTO daily_system_summary (date, total_users, new_users, total_txns, failed_txns, total_volume, last_updated)
+        VALUES (?1, 1, 1, 0, 0, 0, NOW())
         ON CONFLICT (date) DO UPDATE SET
           new_users = daily_system_summary.new_users + 1,
           total_users = daily_system_summary.total_users + 1,
@@ -42,4 +42,3 @@ public interface DailySystemSummaryRepository extends JpaRepository<DailySystemS
         """, nativeQuery = true)
     void incrementUserCreated(LocalDate date);
 }
-

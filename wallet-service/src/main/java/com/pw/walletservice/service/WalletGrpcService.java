@@ -1,5 +1,7 @@
 package com.pw.walletservice.service;
 
+import com.pw.walletservice.kafka.KafkaEventProducer;
+import com.pw.walletservice.model.EventEnvelope;
 import com.walletservice.grpc.*;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -21,8 +23,7 @@ import org.springframework.transaction.TransactionSystemException;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @GrpcService
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class WalletGrpcService extends WalletServiceGrpc.WalletServiceImplBase {
 
     private final WalletRepository walletRepository;
+    private final KafkaEventProducer kafkaEventProducer;
 
     @Override
     public void getTransactions(TransactionHistoryRequest request, StreamObserver<TransactionHistoryResponse> responseObserver) {
@@ -56,7 +58,7 @@ public class WalletGrpcService extends WalletServiceGrpc.WalletServiceImplBase {
                     .build();
 
             log.info("Creating wallet = {}", wallet);
-            walletRepository.save(wallet);
+            Wallet saved = walletRepository.save(wallet);
 
             WalletResponse response = WalletResponse.newBuilder()
                     .setSuccess(true)
@@ -68,6 +70,8 @@ public class WalletGrpcService extends WalletServiceGrpc.WalletServiceImplBase {
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
+
+            log.info("Wallet created successfully :{}", saved.toString());
 
         } catch (IllegalArgumentException e) {
             handleError("Invalid wallet type: " + e.getMessage(), e, responseObserver, Status.INVALID_ARGUMENT);
@@ -138,7 +142,7 @@ public class WalletGrpcService extends WalletServiceGrpc.WalletServiceImplBase {
 
             // Update balance
             wallet.setBalance(wallet.getBalance() + request.getAmount());
-            walletRepository.save(wallet);
+            Wallet saved = walletRepository.save(wallet);
 
             WalletResponse response = WalletResponse.newBuilder()
                     .setSuccess(true)
@@ -151,16 +155,31 @@ public class WalletGrpcService extends WalletServiceGrpc.WalletServiceImplBase {
             responseObserver.onNext(response);
             responseObserver.onCompleted();
 
+            log.info("Wallet credited successfully :{}", wallet.toString());
+
+            Map<String, Object> map = new HashMap<>();
+            map.put("amount", String.valueOf(request.getAmount()));
+
+            EventEnvelope event = new EventEnvelope();
+            event.setEventId(UUID.randomUUID().toString());
+            event.setEventType("WALLET_CREDITED");
+            event.setTimestamp(Instant.now());
+            event.setUserId(saved.getId());
+            event.setPayload(map);
+
+            kafkaEventProducer.sendEvent("wallet-events", event);
+            log.info("Published WALLET_CREDITED event to Kafka for userId={}", saved.getUserId());
+
         } catch (IllegalArgumentException e) {
-            handleError("Invalid input: " + e.getMessage(), e, responseObserver, Status.INVALID_ARGUMENT);
+            handleError("Invalid input: " + e.getMessage(), e, responseObserver, Status.INVALID_ARGUMENT, request.getUserId(), request.getAmount());
         } catch (EntityNotFoundException e) {
-            handleError("Wallet not found: " + e.getMessage(), e, responseObserver, Status.NOT_FOUND);
+            handleError("Wallet not found: " + e.getMessage(), e, responseObserver, Status.NOT_FOUND, request.getUserId(), request.getAmount());
         } catch (OptimisticLockingFailureException e) {
-            handleError("Concurrent modification detected", e, responseObserver, Status.ABORTED);
+            handleError("Concurrent modification detected", e, responseObserver, Status.ABORTED, request.getUserId(), request.getAmount());
         } catch (DataIntegrityViolationException e) {
-            handleError("Data integrity violation: " + e.getMessage(), e, responseObserver, Status.FAILED_PRECONDITION);
+            handleError("Data integrity violation: " + e.getMessage(), e, responseObserver, Status.FAILED_PRECONDITION, request.getUserId(), request.getAmount());
         } catch (Exception e) {
-            handleError("Unexpected error while crediting wallet", e, responseObserver, Status.INTERNAL);
+            handleError("Unexpected error while crediting wallet", e, responseObserver, Status.INTERNAL, request.getUserId(), request.getAmount());
         }
     }
 
@@ -194,7 +213,7 @@ public class WalletGrpcService extends WalletServiceGrpc.WalletServiceImplBase {
 
             // Deduct balance
             wallet.setBalance(wallet.getBalance() - request.getAmount());
-            walletRepository.save(wallet);
+            Wallet saved = walletRepository.save(wallet);
 
             WalletResponse response = WalletResponse.newBuilder()
                     .setSuccess(true)
@@ -207,16 +226,31 @@ public class WalletGrpcService extends WalletServiceGrpc.WalletServiceImplBase {
             responseObserver.onNext(response);
             responseObserver.onCompleted();
 
+            log.info("Wallet debited successfully :{}", wallet.toString());
+
+            Map<String, Object> map = new HashMap<>();
+            map.put("amount", String.valueOf(request.getAmount()));
+
+            EventEnvelope event = new EventEnvelope();
+            event.setEventId(UUID.randomUUID().toString());
+            event.setEventType("WALLET_DEBITED");
+            event.setTimestamp(Instant.now());
+            event.setUserId(saved.getId());
+            event.setPayload(map);
+
+            kafkaEventProducer.sendEvent("wallet-events", event);
+            log.info("Published WALLET_CREDITED event to Kafka for userId={}", saved.getUserId());
+
         } catch (IllegalArgumentException e) {
-            handleError("Invalid input: " + e.getMessage(), e, responseObserver, Status.INVALID_ARGUMENT);
+            handleError("Invalid input: " + e.getMessage(), e, responseObserver, Status.INVALID_ARGUMENT, request.getUserId(), request.getAmount());
         } catch (EntityNotFoundException e) {
-            handleError("Wallet not found: " + e.getMessage(), e, responseObserver, Status.NOT_FOUND);
+            handleError("Wallet not found: " + e.getMessage(), e, responseObserver, Status.NOT_FOUND, request.getUserId(), request.getAmount());
         } catch (OptimisticLockingFailureException e) {
-            handleError("Concurrent modification detected", e, responseObserver, Status.ABORTED);
+            handleError("Concurrent modification detected", e, responseObserver, Status.ABORTED, request.getUserId(), request.getAmount());
         } catch (DataIntegrityViolationException e) {
-            handleError("Data integrity violation: " + e.getMessage(), e, responseObserver, Status.FAILED_PRECONDITION);
+            handleError("Data integrity violation: " + e.getMessage(), e, responseObserver, Status.FAILED_PRECONDITION, request.getUserId(), request.getAmount());
         } catch (Exception e) {
-            handleError("Unexpected error while debiting wallet", e, responseObserver, Status.INTERNAL);
+            handleError("Unexpected error while debiting wallet", e, responseObserver, Status.INTERNAL, request.getUserId(), request.getAmount());
         }
     }
 
@@ -299,16 +333,35 @@ public class WalletGrpcService extends WalletServiceGrpc.WalletServiceImplBase {
             responseObserver.onNext(response);
             responseObserver.onCompleted();
 
+            log.info("Wallet transfer successfully from :{} to: {}", fromWallet.toString(), toWallet.toString());
+
+            // payload: { fromUserId, toUserId, amount, success }
+            Map<String, Object> map = new HashMap<>();
+            map.put("amount", String.valueOf(request.getAmount()));
+            map.put("fromUserId", String.valueOf(fromWallet.getUserId()));
+            map.put("toUserId", String.valueOf(toWallet.getUserId()));
+            map.put("success", Boolean.TRUE);
+
+            EventEnvelope event = new EventEnvelope();
+            event.setEventId(UUID.randomUUID().toString());
+            event.setEventType("WALLET_FAILED");
+            event.setTimestamp(Instant.now());
+            event.setUserId(fromWallet.getUserId());
+            event.setPayload(map);
+
+            kafkaEventProducer.sendEvent("wallet-events", event);
+            log.info("Published transfer event to Kafka from user wallet ={} toUser wallet={}", fromWallet.getUserId(), toWallet.getUserId());
+
         } catch (IllegalArgumentException e) {
-            handleError("Invalid transfer request: " + e.getMessage(), e, responseObserver, Status.INVALID_ARGUMENT);
+            handleError("Invalid transfer request: " + e.getMessage(), e, responseObserver, Status.INVALID_ARGUMENT, request.getFromUserId(), request.getAmount());
         } catch (EntityNotFoundException e) {
-            handleError("Wallet not found: " + e.getMessage(), e, responseObserver, Status.NOT_FOUND);
+            handleError("Wallet not found: " + e.getMessage(), e, responseObserver, Status.NOT_FOUND, request.getFromUserId(), request.getAmount());
         } catch (OptimisticLockingFailureException e) {
-            handleError("Concurrent transfer conflict", e, responseObserver, Status.ABORTED);
+            handleError("Concurrent transfer conflict", e, responseObserver, Status.ABORTED, request.getFromUserId(), request.getAmount());
         } catch (DataIntegrityViolationException e) {
-            handleError("Data integrity violation during transfer", e, responseObserver, Status.FAILED_PRECONDITION);
+            handleError("Data integrity violation during transfer", e, responseObserver, Status.FAILED_PRECONDITION, request.getFromUserId(), request.getAmount());
         } catch (Exception e) {
-            handleError("Unexpected error during transfer", e, responseObserver, Status.INTERNAL);
+            handleError("Unexpected error during transfer", e, responseObserver, Status.INTERNAL, request.getFromUserId(), request.getAmount());
         }
     }
 
@@ -321,4 +374,31 @@ public class WalletGrpcService extends WalletServiceGrpc.WalletServiceImplBase {
         log.error("{}: {}", message, e.getMessage(), e);
         responseObserver.onError(status.withDescription(message).withCause(e).asRuntimeException());
     }
+
+    // Overloaded method with userId and amount details
+    private <T> void handleError(String message, Exception e, StreamObserver<T> responseObserver, Status status,
+                                 Long userId, int amount) {
+        log.error("{}: {}", message, e.getMessage(), e);
+        responseObserver.onError(status.withDescription(message).withCause(e).asRuntimeException());
+
+        // Create the payload with additional details
+        Map<String, Object> map = new HashMap<>();
+        map.put("amount", String.valueOf(amount));
+        map.put("userId", String.valueOf(userId));
+        if (userId != null) {
+            map.put("userId", String.valueOf(userId));
+        }
+        map.put("success", Boolean.FALSE);
+
+        EventEnvelope event = new EventEnvelope();
+        event.setEventId(UUID.randomUUID().toString());
+        event.setEventType("WALLET_FAILED");
+        event.setTimestamp(Instant.now());
+        event.setUserId(userId);
+        event.setPayload(map);
+
+        kafkaEventProducer.sendEvent("wallet-events", event);
+        log.info("Published WALLET_FAILED event to Kafka from user wallet={} to user wallet={} failed", userId, userId);
+    }
+
 }

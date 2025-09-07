@@ -55,6 +55,7 @@ public class TransactionService {
 
             log.info("Calling WalletService gRPC transfer: sender={}, receiver={}, amount={}", senderId, receiverId, amount);
             response = walletStub.transfer(request);
+            log.info("gRPC transfer response: {}", response.toString());
             if (!response.getSuccess()) {
                 throw new InsufficientBalanceException("WalletService failed transfer due to insufficient balance");
             }

@@ -26,10 +26,10 @@ public class TransactionController {
      * Initiates a transfer (debit sender, credit receiver)
      */
     @PostMapping("/transfer")
-    public ResponseEntity<WalletResponse> transfer(@Valid @RequestBody TransferRequestDTO request) {
+    public ResponseEntity<String> transfer(@Valid @RequestBody TransferRequestDTO request) {
         log.info("Transfer request: sender={}, receiver={}, amount={}", request.getSenderId(), request.getReceiverId(), request.getAmount());
         WalletResponse walletResponse = transactionService.transfer(request.getSenderId(), request.getReceiverId(), request.getAmount());
-        return ResponseEntity.ok(walletResponse);
+        return ResponseEntity.ok(walletResponse.toString());
     }
 
     /**

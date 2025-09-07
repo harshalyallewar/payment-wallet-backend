@@ -46,9 +46,13 @@ public class EventProcessor {
             return;
         }
 
+        log.info("Processing : event: {}", env.toString());
+
         // 2) persist raw event
         String payloadJson = objectMapper.writeValueAsString(env.getPayload());
         rawEventRepository.save(new RawEvent(env.getEventType(), eventId, env.getUserId(), payloadJson));
+
+        log.info("Successfully processed event and saved to raw repo: {}", env.toString());
 
         // 3) route to handlers
         LocalDate eventDate = toLocalDate(env);
@@ -97,6 +101,7 @@ public class EventProcessor {
         if (env.getUserId() == null) return;
         BigDecimal amount = amountFrom(env);
         dailyUserSummaryRepository.incrementDebits(env.getUserId(), date, amount);
+        log.info("dailyUserSummaryRepository Debit processed for user {}, amount {}", env.getUserId(), amount);
         dailySystemSummaryRepository.incrementSystemTxn(date, amount);
     }
 

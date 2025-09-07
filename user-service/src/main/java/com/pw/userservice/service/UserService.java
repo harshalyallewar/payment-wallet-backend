@@ -5,6 +5,8 @@ import com.pw.userservice.dto.UserResponseDTO;
 import com.pw.userservice.dto.UserUpdateRequestDTO;
 import com.pw.userservice.exception.UserNotFoundException;
 import com.pw.userservice.grpc.WalletGrpcService;
+import com.pw.userservice.kafka.KafkaEventProducer;
+import com.pw.userservice.model.EventEnvelope;
 import com.pw.userservice.model.User;
 import com.pw.userservice.repository.UserRepository;
 import com.userservice.grpc.AccountStatus;
@@ -16,6 +18,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -27,7 +31,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final WalletGrpcService walletGrpcService;
-
+    private final KafkaEventProducer kafkaEventProducer;
     /**
      * Creates a new user and triggers wallet creation via gRPC.
      * Rolls back automatically on runtime exceptions.
@@ -54,6 +58,14 @@ public class UserService {
 
             User saved = userRepository.save(user);
             log.info("User created successfully with id: {}", saved.getId());
+            EventEnvelope event = new EventEnvelope();
+            event.setEventId(UUID.randomUUID().toString());
+            event.setEventType("USER_CREATED");
+            event.setTimestamp(Instant.now());
+            event.setUserId(saved.getId());
+            event.setPayload(Collections.emptyMap());
+
+            kafkaEventProducer.sendEvent("user-events", event);
 
             // gRPC call to wallet service
             try {

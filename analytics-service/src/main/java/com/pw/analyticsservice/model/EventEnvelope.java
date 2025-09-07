@@ -1,5 +1,8 @@
 package com.pw.analyticsservice.model;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Instant;
 import java.util.Map;
 
@@ -15,6 +18,7 @@ import java.util.Map;
  * }
  */
 public class EventEnvelope {
+    private static final Logger log = LoggerFactory.getLogger(EventEnvelope.class);
     private String eventType;
     private String eventId;
     private Instant timestamp;
@@ -31,5 +35,18 @@ public class EventEnvelope {
     public void setUserId(Long userId) { this.userId = userId; }
     public Map<String, Object> getPayload() { return payload; }
     public void setPayload(Map<String, Object> payload) { this.payload = payload; }
+
+    @Override
+    public String toString() {
+        return "EventEnvelope{" +
+                "eventType='" + eventType + '\'' +
+                ", eventId='" + eventId + '\'' +
+                ", timestamp=" + timestamp +
+                ", userId=" + userId +
+                ", payload=" + payload +
+                '}';
+    }
+
+
 }
 

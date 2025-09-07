@@ -15,15 +15,6 @@ import org.springframework.stereotype.Component;
 public class KafkaEventListener {
     private static final Logger log = LoggerFactory.getLogger(KafkaEventListener.class);
 
-    @Value("${analytics.topics.user}")
-    private String userTopic;
-    @Value("${analytics.topics.wallet}")
-    private String walletTopic;
-    @Value("${analytics.topics.transaction}")
-    private String txnTopic;
-    @Value("${analytics.topics.auth}")
-    private String authTopic;
-
     private final ObjectMapper objectMapper;
     private final EventProcessor processor;
 
@@ -32,16 +23,21 @@ public class KafkaEventListener {
         this.processor = processor;
     }
 
-    @KafkaListener(topics = {"#{'${analytics.topics.user}'}",
-            "#{'${analytics.topics.wallet}'}",
-            "#{'${analytics.topics.transaction}'}",
-            "#{'${analytics.topics.auth}'}"},
+    @KafkaListener(topics = {
+            "${analytics.topics.user}",
+            "${analytics.topics.wallet}",
+            "${analytics.topics.transaction}",
+            "${analytics.topics.auth}"
+    },
             containerFactory = "kafkaListenerContainerFactory")
     public void onMessage(ConsumerRecord<String, String> record, Acknowledgment ack) {
         try {
+
             String value = record.value();
             EventEnvelope env = objectMapper.readValue(value, EventEnvelope.class);
+            log.info("Received event: " + env.toString());
             processor.process(env);
+
             ack.acknowledge();
         } catch (Exception ex) {
             // DO NOT ack; let it retry (or configure DLT in Kafka if needed)
